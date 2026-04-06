@@ -692,16 +692,22 @@ async function* openaiStreamToAnthropic(
           // Close active tool calls
           for (const [, tc] of activeToolCalls) {
             if (tc.normalizeAtStop) {
-              const repairedStructuredJson = repairPossiblyTruncatedObjectJson(
-                tc.jsonBuffer,
-              )
               let partialJson: string
-              if (repairedStructuredJson) {
-                partialJson = repairedStructuredJson
+              if (choice.finish_reason === 'length') {
+                // Truncated by max tokens — preserve raw buffer to avoid
+                // turning an incomplete tool call into an executable command
+                partialJson = tc.jsonBuffer
               } else {
-                partialJson = JSON.stringify(
-                  normalizeToolArguments(tc.name, tc.jsonBuffer),
+                const repairedStructuredJson = repairPossiblyTruncatedObjectJson(
+                  tc.jsonBuffer,
                 )
+                if (repairedStructuredJson) {
+                  partialJson = repairedStructuredJson
+                } else {
+                  partialJson = JSON.stringify(
+                    normalizeToolArguments(tc.name, tc.jsonBuffer),
+                  )
+                }
               }
 
               yield {
